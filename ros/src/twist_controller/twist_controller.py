@@ -41,7 +41,7 @@ class Controller(object):
         target_linear = kwargs['target_linear']
         target_angular = kwargs['target_angular']
         current_velocity = kwargs['current_velocity']
-        time_delta = 1 / kwargs['rate']
+        time_delta = 1.0 / kwargs['rate']
         dbw_enable = kwargs['dbw_enable']
 
         # Get the steer from yaw contoller:
