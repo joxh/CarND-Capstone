@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import rospy
+import tf
 import tf2_ros
 import tf2_geometry_msgs
 from std_msgs.msg import Int32
@@ -48,6 +49,7 @@ class WaypointUpdater(object):
         self.base_waypoints_lane = None
         self.got_base_waypoints = False
         self.current_transform = None
+        self.current_waypoint_ind = None
 
         #SIM ONLY: TrafficLightArray
         self.sub_traffic_lights_gt = rospy.Subscriber('/traffic_waypoint', TrafficLightArray, self.traffic_lights_gt_cb)
@@ -60,8 +62,9 @@ class WaypointUpdater(object):
         self.current_pose = msg
         self.current_transform = self.generate_transform_from_pose(self.current_pose)
 
-        if self.got_base_waypoints:
+        if self.got_base_waypoints and msg.header.seq % 10 == 0:
             self.publish_next_waypoints()
+            
 
         rospy.loginfo('Current pose is (%s, %s, %s), and got_base_waypoints is %s', 
                       msg.pose.position.x, msg.pose.position.y, msg.pose.position.z, self.got_base_waypoints)
@@ -128,7 +131,7 @@ class WaypointUpdater(object):
         trans_to_local.transform.rotation.y = pose_local.pose.orientation.y
         trans_to_local.transform.rotation.z = pose_local.pose.orientation.z
         trans_to_local.transform.rotation.w = pose_local.pose.orientation.w
-        
+
         return trans_to_local
 
     def to_car_coord(self, pose, transform=None):
@@ -138,15 +141,27 @@ class WaypointUpdater(object):
         return tf2_geometry_msgs.tf2_geometry_msgs.do_transform_pose(pose, transform)
 
     def publish_next_waypoints(self):
-        trans = self.current_transform
+        
         next_waypoint_ind = None
         min_dist_lateral = None
+        current_pose = self.current_pose
+        _, _, theta = tf.transformations.euler_from_quaternion([current_pose.pose.orientation.w, 0, 0, current_pose.pose.orientation.z])
+        yhat = math.sin(theta)
+        xhat = math.cos(theta)
+        if self.current_waypoint_ind is None:
+            ind_to_check = range(self.num_waypoints)
+        else:
+            ind_to_check = [(i + self.current_waypoint_ind)%self.num_waypoints for i in range(-20, 20)]
 
-        for i, wp in enumerate(self.base_waypoints_lane.waypoints):
+        for i in ind_to_check:
+            wp = self.base_waypoints_lane.waypoints[i]
             #Check each waypoint's
-            pos_trans = self.to_car_coord(wp.pose, transform=trans)
-            dist_lateral = math.sqrt(pos_trans.pose.position.x**2 + pos_trans.pose.position.y**2)
-            in_front = pos_trans.pose.position.x > 0 # Maybe should be larger
+            dx = wp.pose.pose.position.x - current_pose.pose.position.x
+            dy = wp.pose.pose.position.y - current_pose.pose.position.y
+            dist_lateral = math.sqrt(dx**2 + dy**2)
+
+            in_front_dist = 3 #meters
+            in_front = xhat*dx + yhat*dy > in_front_dist #Two meters ahead
 
             if in_front:
                 if next_waypoint_ind is not None:
@@ -159,9 +174,13 @@ class WaypointUpdater(object):
         
         if next_waypoint_ind is None:
             next_waypoint_ind = 0
+            self.current_waypoint_ind = None
+        else:
+            self.current_waypoint_ind = next_waypoint_ind
         
         #Check if need to read forward or backwards: Not implemented
         
+
         waypoints_ind_to_return = [(i + next_waypoint_ind)%self.num_waypoints for i in range(LOOKAHEAD_WPS)]
         waypoints_to_return = [self.base_waypoints_lane.waypoints[i] for i in waypoints_ind_to_return]
         
@@ -170,8 +189,8 @@ class WaypointUpdater(object):
         lane_to_publish.waypoints = waypoints_to_return
         self.final_waypoints_pub.publish(lane_to_publish)
 
-        rospy.loginfo('Next waypoint in local coords is %s', 
-                      self.to_car_coord(waypoints_to_return[0].pose))
+        rospy.loginfo('Next waypoint is %s', 
+                      waypoints_to_return[0].pose)
 
 
 if __name__ == '__main__':
