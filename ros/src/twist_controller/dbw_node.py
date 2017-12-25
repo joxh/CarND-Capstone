@@ -54,11 +54,29 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        # self.controller = TwistController(<Arguments you wish to provide>)
+        #self.controller = TwistController(<Arguments you wish to provide>)
+        self.controller = Controller(vehicle_mass = vehicle_mass, fuel_capacity = fuel_capacity,
+                                                brake_deadband = brake_deadband,
+                                                decel_limit = decel_limit, accel_limit = accel_limit,
+                                                wheel_radius = wheel_radius, wheel_base = wheel_base,
+                                                steer_ratio = steer_ratio, max_lat_accel = max_lat_accel,
+                                                max_steer_angle = max_steer_angle)
 
         # TODO: Subscribe to all the topics you need to
-
+        rospy.Subscriber('/current_velocity', TwistStamped, self.get_velocity_cb)
+        rospy.Subscriber('/twist_cmd', TwistStamped, self.get_twist_cb)
+        rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.get_dbw_enable_cb)
+        self.velocity, self.twist, self.dbw_enable = None, None, None
         self.loop()
+
+    def get_velocity_cb(self, v):
+        self.velocity = v
+
+    def get_twist_cb(self, twist):
+        self.twist = twist
+
+    def get_dbw_enable_cb(self, dbw_enable):
+        self.dbw_enable = dbw_enable
 
     def loop(self):
         rate = rospy.Rate(50) # 50Hz
@@ -71,7 +89,20 @@ class DBWNode(object):
             #                                                     <dbw status>,
             #                                                     <any other argument you need>)
             # if <dbw is enabled>:
-            #   self.publish(throttle, brake, steer)
+            #   self.publish(throttle, brake, steer)                                                  <any other argument you need>)
+
+
+            #if not initilized, have to wait        
+            if self.twist == None or self.velocity == None or dbw_enable == None:
+                continue
+
+            # Use rate = 50 to calculate accleration.
+            throttle, brake, steering = self.controller.control(target_linear = self.twist.twist.linear,
+                                                                 target_angular = self.twist.twist.angular,
+                                                                 current_velocity = self.velocity,
+                                                                 dbw_enable = self.dbw_enable.data, rate = 50)
+            if self.dbw_enable.data == True:
+                self.publish(throttle, brake, steer)
             rate.sleep()
 
     def publish(self, throttle, brake, steer):
