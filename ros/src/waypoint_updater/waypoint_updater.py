@@ -48,7 +48,6 @@ class WaypointUpdater(object):
         self.current_pose = None
         self.base_waypoints_lane = None
         self.got_base_waypoints = False
-        self.current_transform = None
         self.current_waypoint_ind = None
 
         #SIM ONLY: TrafficLightArray
@@ -60,7 +59,6 @@ class WaypointUpdater(object):
     def pose_cb(self, msg):
         # TODO: Implement
         self.current_pose = msg
-        self.current_transform = self.generate_transform_from_pose(self.current_pose)
 
         if self.got_base_waypoints and msg.header.seq % 10 == 0:
             self.publish_next_waypoints()
@@ -108,37 +106,6 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
-
-    def generate_transform_from_pose(self, pose_local, stamped=False, child_frame_id='base_link'):
-        """Generates a transform to local coords of object with pose
-        Probably should use the broadcasted transform from the /tf topic instead
-        """
-
-        trans_to_local = TransformStamped()
-
-        trans_to_local.header.stamp = pose_local.header.stamp
-        trans_to_local.header.frame_id = pose_local.header.frame_id
-        trans_to_local.header.seq = pose_local.header.seq
-
-
-        trans_to_local.child_frame_id = child_frame_id
-
-        trans_to_local.transform.translation.x = pose_local.pose.position.x
-        trans_to_local.transform.translation.y = pose_local.pose.position.y
-        trans_to_local.transform.translation.z = pose_local.pose.position.z
-
-        trans_to_local.transform.rotation.x = pose_local.pose.orientation.x
-        trans_to_local.transform.rotation.y = pose_local.pose.orientation.y
-        trans_to_local.transform.rotation.z = pose_local.pose.orientation.z
-        trans_to_local.transform.rotation.w = pose_local.pose.orientation.w
-
-        return trans_to_local
-
-    def to_car_coord(self, pose, transform=None):
-        if transform is None:
-            transform = self.current_transform
-        
-        return tf2_geometry_msgs.tf2_geometry_msgs.do_transform_pose(pose, transform)
 
     def publish_next_waypoints(self):
         
