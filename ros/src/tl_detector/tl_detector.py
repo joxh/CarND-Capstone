@@ -14,6 +14,7 @@ import yaml
 import math
 
 STATE_COUNT_THRESHOLD = 3
+# Set OUTPUT_IMG = True to generate training data.
 OUTPUT_IMG = False
 MAX_LIMIT = 1000000
 
@@ -85,6 +86,7 @@ class TLDetector(object):
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
+
         if self.state != state:
             self.state_count = 0
             self.state = state
@@ -111,7 +113,9 @@ class TLDetector(object):
             if not os.path.exists("./output_imgs"):
                 os.makedirs("./output_imgs")
             cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-            cv2.imwrite('./output_imgs/' + str(self.output_img_cnt) + '.png', cv_image)
+	    # Call process_traffic_lights to get state in sync with image
+	    light_wp, state = self.process_traffic_lights()
+            cv2.imwrite('./output_imgs/' + str(self.output_img_cnt)  + '_' + str(state) + '.png', cv_image)
             rospy.loginfo('Write to image output file' + str(os.getcwd()) + str(self.output_img_cnt))
             self.output_img_cnt = self.output_img_cnt + 1
             rate.sleep()
@@ -206,7 +210,7 @@ class TLDetector(object):
         if self.waypoints == None or self.pose == None:
             return -1, TrafficLight.UNKNOWN
 
-        light = None
+        
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
@@ -215,7 +219,7 @@ class TLDetector(object):
 
         # Find the closest visible traffic light (if one exists)
         nearest_stop_line_wp_idx = MAX_LIMIT
-        visible = None
+        light = None
         light_idx = None
 
         # Yipeng: Iterate all the stop lines from the config file to find nearest one.
@@ -236,16 +240,19 @@ class TLDetector(object):
         # this is the traffic light index w.r.t to this stop line
         light_idx = self.get_tl_for_stop_line(nearest_stop_line_wp_idx)
         # Check if the tl is visible to the car
-        visible = self.if_tl_visible(self.pose.pose, light_idx)
+        light = self.if_tl_visible(self.pose.pose, light_idx)
         # Ground truth light state, used for training only:
         state = self.lights[light_idx].state
-
+	# Nest light waypoint
+	light_wp = nearest_stop_line_wp_idx
         # Print out the information. We can use this together with images for generating training set.
         rospy.loginfo('Car_waypoint:{}, next_stopline_waypoint:{}, next_tl_index:{},tl_visibility:{}, state{}'.format(car_position,
-                                nearest_stop_line_wp_idx, light_idx, visible, state))
+                                nearest_stop_line_wp_idx, light_idx, light, state))
 
         if light:
-            state = self.get_light_state(light)
+	    # Set OUTPUT_IMG = True to generate training data	
+	    if not OUTPUT_IMG:	
+            	state = self.get_light_state(light)
             return light_wp, state
         #self.waypoints = None
 
