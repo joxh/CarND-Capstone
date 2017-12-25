@@ -93,11 +93,12 @@ class DBWNode(object):
 
 
             #if not initilized, have to wait        
-            if self.twist == None or self.velocity == None or dbw_enable == None:
+            if self.twist == None or self.velocity == None or self.dbw_enable == None:
+                rate.sleep()
                 continue
 
             # Use rate = 50 to calculate accleration.
-            throttle, brake, steering = self.controller.control(target_linear = self.twist.twist.linear,
+            throttle, brake, steer = self.controller.control(target_linear = self.twist.twist.linear,
                                                                  target_angular = self.twist.twist.angular,
                                                                  current_velocity = self.velocity,
                                                                  dbw_enable = self.dbw_enable.data, rate = 50)
