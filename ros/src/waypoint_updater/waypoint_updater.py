@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg import Lane, Waypoint
+import tf2_ros
+import tf2_geometry_msgs
+from std_msgs.msg import Int32
+from geometry_msgs.msg import PoseStamped, TransformStamped
+from styx_msgs.msg import Lane, Waypoint, TrafficLightArray
 
 import math
 
@@ -28,32 +31,65 @@ class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
-        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
-        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+        self.sub_current_pose = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        self.sub_base_waypoints = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+        
+        # Add a subscriber for /traffic_waypoint
+        self.sub_traffic_waypoint = rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
+        # TODO: Add a subscriber for /obstacle_waypoint below
+        #self.sub_obstacle_waypoint = rospy.Subscriber('/obstacle_waypoint', Int32, self.obstacle_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
+        self.current_pose = None
+        self.base_waypoints_lane = None
+        self.got_base_waypoints = False
+        self.current_transform = None
+
+        #SIM ONLY: TrafficLightArray
+        self.sub_traffic_lights_gt = rospy.Subscriber('/traffic_waypoint', TrafficLightArray, self.traffic_lights_gt_cb)
+        
 
         rospy.spin()
 
     def pose_cb(self, msg):
         # TODO: Implement
-        pass
+        self.current_pose = msg
+        self.current_transform = self.generate_transform_from_pose(self.current_pose)
+
+        if self.got_base_waypoints:
+            self.publish_next_waypoints()
+
+        rospy.loginfo('Current pose is (%s, %s, %s), and got_base_waypoints is %s', 
+                      msg.pose.position.x, msg.pose.position.y, msg.pose.position.z, self.got_base_waypoints)
+
+        
+
+
+        
 
     def waypoints_cb(self, waypoints):
         # TODO: Implement
-        pass
+        rospy.loginfo('Got the base waypoints!')
+        self.base_waypoints_lane = waypoints
+        self.got_base_waypoints = True
+        self.num_waypoints = len(self.base_waypoints_lane.waypoints)
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
+        rospy.loginfo('Current /traffic_waypoint is %s', msg.data)
+
         pass
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
+        pass
+
+    def traffic_lights_gt_cb(self, msg):
+        # TODO: Callback for dealing with traffic light ground truth
         pass
 
     def get_waypoint_velocity(self, waypoint):
@@ -69,6 +105,73 @@ class WaypointUpdater(object):
             dist += dl(waypoints[wp1].pose.pose.position, waypoints[i].pose.pose.position)
             wp1 = i
         return dist
+
+    def generate_transform_from_pose(self, pose_local, stamped=False, child_frame_id='base_link'):
+        """Generates a transform to local coords of object with pose
+        Probably should use the broadcasted transform from the /tf topic instead
+        """
+
+        trans_to_local = TransformStamped()
+
+        trans_to_local.header.stamp = pose_local.header.stamp
+        trans_to_local.header.frame_id = pose_local.header.frame_id
+        trans_to_local.header.seq = pose_local.header.seq
+
+
+        trans_to_local.child_frame_id = child_frame_id
+
+        trans_to_local.transform.translation.x = pose_local.pose.position.x
+        trans_to_local.transform.translation.y = pose_local.pose.position.y
+        trans_to_local.transform.translation.z = pose_local.pose.position.z
+
+        trans_to_local.transform.rotation.x = pose_local.pose.orientation.x
+        trans_to_local.transform.rotation.y = pose_local.pose.orientation.y
+        trans_to_local.transform.rotation.z = pose_local.pose.orientation.z
+        trans_to_local.transform.rotation.w = pose_local.pose.orientation.w
+        
+        return trans_to_local
+
+    def to_car_coord(self, pose, transform=None):
+        if transform is None:
+            transform = self.current_transform
+        
+        return tf2_geometry_msgs.tf2_geometry_msgs.do_transform_pose(pose, transform)
+
+    def publish_next_waypoints(self):
+        trans = self.current_transform
+        next_waypoint_ind = None
+        min_dist_lateral = None
+
+        for i, wp in enumerate(self.base_waypoints_lane.waypoints):
+            #Check each waypoint's
+            pos_trans = self.to_car_coord(wp.pose, transform=trans)
+            dist_lateral = math.sqrt(pos_trans.pose.position.x**2 + pos_trans.pose.position.y**2)
+            in_front = pos_trans.pose.position.x > 0 # Maybe should be larger
+
+            if in_front:
+                if next_waypoint_ind is not None:
+                    if dist_lateral < min_dist_lateral:
+                        next_waypoint_ind = i
+                        min_dist_lateral = dist_lateral 
+                else:
+                    next_waypoint_ind = i
+                    min_dist_lateral = dist_lateral
+        
+        if next_waypoint_ind is None:
+            next_waypoint_ind = 0
+        
+        #Check if need to read forward or backwards: Not implemented
+        
+        waypoints_ind_to_return = [(i + next_waypoint_ind)%self.num_waypoints for i in range(LOOKAHEAD_WPS)]
+        waypoints_to_return = [self.base_waypoints_lane.waypoints[i] for i in waypoints_ind_to_return]
+        
+        lane_to_publish = Lane()
+        lane_to_publish.header = self.current_pose.header
+        lane_to_publish.waypoints = waypoints_to_return
+        self.final_waypoints_pub.publish(lane_to_publish)
+
+        rospy.loginfo('Next waypoint in local coords is %s', 
+                      self.to_car_coord(waypoints_to_return[0].pose))
 
 
 if __name__ == '__main__':
