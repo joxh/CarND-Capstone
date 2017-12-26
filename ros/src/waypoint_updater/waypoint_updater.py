@@ -30,6 +30,13 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 class WaypointUpdater(object):
     def __init__(self):
+
+        # TODO: Add other member variables you need below
+        self.current_pose = None
+        self.base_waypoints_lane = None
+        self.got_base_waypoints = False
+        self.current_waypoint_ind = None
+
         rospy.init_node('waypoint_updater')
 
         self.sub_current_pose = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
@@ -44,11 +51,7 @@ class WaypointUpdater(object):
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
-        self.current_pose = None
-        self.base_waypoints_lane = None
-        self.got_base_waypoints = False
-        self.current_waypoint_ind = None
+
 
         #SIM ONLY: TrafficLightArray
         self.sub_traffic_lights_gt = rospy.Subscriber('/traffic_waypoint', TrafficLightArray, self.traffic_lights_gt_cb)
@@ -61,7 +64,11 @@ class WaypointUpdater(object):
         self.current_pose = msg
 
         if self.got_base_waypoints and msg.header.seq % 10 == 0:
+            if msg.header.seq % 100 == 0:
+                self.current_waypoint_ind = None
             self.publish_next_waypoints()
+        else:
+            pass
             
 
         rospy.loginfo('Current pose is (%s, %s, %s), and got_base_waypoints is %s', 
@@ -112,7 +119,13 @@ class WaypointUpdater(object):
         next_waypoint_ind = None
         min_dist_lateral = None
         current_pose = self.current_pose
-        _, _, theta = tf.transformations.euler_from_quaternion([current_pose.pose.orientation.w, 0, 0, current_pose.pose.orientation.z])
+
+        theta = 2 * math.atan2(current_pose.pose.orientation.z, 
+                            current_pose.pose.orientation.w)
+
+        rospy.loginfo('Theta= %s', theta * 180 / math.pi)
+
+
         yhat = math.sin(theta)
         xhat = math.cos(theta)
         if self.current_waypoint_ind is None:
