@@ -15,6 +15,7 @@ import math
 
 STATE_COUNT_THRESHOLD = 3
 OUTPUT_IMG = False
+MAX_LIMIT = 1000000
 
 class TLDetector(object):
     def __init__(self):
@@ -126,7 +127,7 @@ class TLDetector(object):
 
         """
         # Reused some code Joshua put in waypoint_upodater to find closeast wp:
-        min_dist_lateral = 1000000.0
+        min_dist_lateral = MAX_LIMIT
         nearest_wp = None
         for i in range(0, len(self.waypoints.waypoints)):
             wp = self.waypoints.waypoints[i]
@@ -164,7 +165,7 @@ class TLDetector(object):
     # Note that traffic light is from the topic /traffic_lights, and stop line is from the config file.
     # I am not sure if /traffic_lights will be availabe during test
     def get_tl_for_stop_line(self, stop_line_wp_idx):
-        min_dist_lateral = 1000000.0
+        min_dist_lateral = MAX_LIMIT
         nearest_light_idx = None
         for i in range(0, len(self.lights)):
             #Check each waypoint's
@@ -213,7 +214,7 @@ class TLDetector(object):
             car_position = self.get_closest_waypoint(self.pose.pose)
 
         # Find the closest visible traffic light (if one exists)
-        nearest_stop_line_wp_idx = 1000000
+        nearest_stop_line_wp_idx = MAX_LIMIT
         visible = None
         light_idx = None
 
@@ -229,12 +230,14 @@ class TLDetector(object):
             # check if this stop line is the nearest one
             if stop_line_wp_idx < nearest_stop_line_wp_idx and stop_line_wp_idx > car_position:
                 nearest_stop_line_wp_idx = stop_line_wp_idx
+        if nearest_stop_line_wp_idx == MAX_LIMIT:
+            nearest_stop_line_wp_idx = 0
 
         # this is the traffic light index w.r.t to this stop line
         light_idx = self.get_tl_for_stop_line(nearest_stop_line_wp_idx)
         # Check if the tl is visible to the car
         visible = self.if_tl_visible(self.pose.pose, light_idx)
-        # Ground trueth light state, used for training only:
+        # Ground truth light state, used for training only:
         state = self.lights[light_idx].state
 
         # Print out the information. We can use this together with images for generating training set.
