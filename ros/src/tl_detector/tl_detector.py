@@ -181,6 +181,10 @@ class TLDetector(object):
                 min_dist_lateral = dist_lateral
         return nearest_light_idx
 
+    def get_car_in_plane_theta(car_pose):
+        theta = 2 * math.atan2(car_pose.pose.orientation.z,
+                            car_pose.pose.orientation.w)
+        return theta
 
     # Yipeng: This function is to determine if the car can see the traffic light.
     # For now, I just use a simple distance to check visibility.
@@ -188,10 +192,25 @@ class TLDetector(object):
     # like map 3d to 2d, etc.
     # Reference: https://discussions.udacity.com/t/focal-length-wrong/358568/22?u=alanxiaoyi
     def if_tl_visible(self, car_pose, light_idx):
+        theta = get_car_in_plane_theta(car_pose)
+        # Unit vector in direction of car's line of sight
+        v_hat_x = math.cos(theta)
+        v_hat_y = math.sin(theta)
+
         dx = self.lights[light_idx].pose.pose.position.x - car_pose.position.x
         dy = self.lights[light_idx].pose.pose.position.y - car_pose.position.y
+
         dist = math.sqrt(dx**2 + dy**2)
-        if dist > 5 and dist < 70:
+
+        angle_to_tl_absolute = math.atan2(dy, dx)
+
+        angle_to_tl_relative = ((angle_to_tl_absolute - theta) + math.pi)%(2 * math.pi) - math.pi
+
+        light_is_close = dist > 5 and dist < 70
+
+        light_is_in_front = math.abs(angle_to_tl_relative) < math.pi/2
+
+        if light_is_close and light_is_in_front:
             return True
         else:
             return False
