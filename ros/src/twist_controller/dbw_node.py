@@ -97,13 +97,19 @@ class DBWNode(object):
                 rate.sleep()
                 continue
 
-            # Use rate = 50 to calculate accleration.
-            throttle, brake, steer = self.controller.control(target_linear = self.twist.twist.linear,
+            # Need restart PID controller when switch to manual
+            if self.dbw_enable.data == False:
+                self.controller.resetpid()
+
+            else:
+                # Use rate = 50 to calculate accleration.
+                throttle, brake, steer = self.controller.control(target_linear = self.twist.twist.linear,
                                                                  target_angular = self.twist.twist.angular,
                                                                  current_velocity = self.velocity,
                                                                  dbw_enable = self.dbw_enable.data, rate = 50)
             if self.dbw_enable.data == True:
                 self.publish(throttle, brake, steer)
+
             rate.sleep()
 
     def publish(self, throttle, brake, steer):

@@ -67,7 +67,7 @@ class Controller(object):
 
         # if we need throttle:
         if accel > 0:
-                throttle = max(self.accel_limit, accel)
+                throttle = min(self.accel_limit, accel)
 
         # if we need brake:
         else:
@@ -75,6 +75,8 @@ class Controller(object):
 
         return throttle, brake, steer
 
+    def resetpid(self):
+        self.pid_ctl.reset()
 
     # We need to calculate brake from accel(decel)
     # reference: https://discussions.udacity.com/t/what-is-the-range-for-the-brake-in-the-dbw-node/412339
