@@ -181,9 +181,9 @@ class TLDetector(object):
                 min_dist_lateral = dist_lateral
         return nearest_light_idx
 
-    def get_car_in_plane_theta(car_pose):
-        theta = 2 * math.atan2(car_pose.pose.orientation.z,
-                            car_pose.pose.orientation.w)
+    def get_car_in_plane_theta(self,car_pose):
+        theta = 2 * math.atan2(car_pose.orientation.z,
+                            car_pose.orientation.w)
         return theta
 
     # Yipeng: This function is to determine if the car can see the traffic light.
@@ -192,7 +192,7 @@ class TLDetector(object):
     # like map 3d to 2d, etc.
     # Reference: https://discussions.udacity.com/t/focal-length-wrong/358568/22?u=alanxiaoyi
     def if_tl_visible(self, car_pose, light_idx):
-        theta = get_car_in_plane_theta(car_pose)
+        theta = self.get_car_in_plane_theta(car_pose)
         # Unit vector in direction of car's line of sight
         v_hat_x = math.cos(theta)
         v_hat_y = math.sin(theta)
@@ -208,7 +208,7 @@ class TLDetector(object):
 
         light_is_close = dist > 5 and dist < 70
 
-        light_is_in_front = math.abs(angle_to_tl_relative) < math.pi/2
+        light_is_in_front = abs(angle_to_tl_relative) < math.pi/2
 
         if light_is_close and light_is_in_front:
             return True
@@ -267,12 +267,12 @@ class TLDetector(object):
         # Print out the information. We can use this together with images for generating training set.
         #rospy.loginfo('Car_waypoint:{}, next_stopline_waypoint:{}, next_tl_index:{},tl_visibility:{}, state{}'.format(car_position,
         #                        nearest_stop_line_wp_idx, light_idx, light, state))
-        light=1 #for testing
+        # light=1 #for testing
         if light:
         # Set OUTPUT_IMG = True to generate training data
         # if not OUTPUT_IMG:
-            state = self.get_light_state(light)
-            rospy.loginfo(state)
+            # state = self.get_light_state(light)
+            # rospy.loginfo(state)
         #     return light_wp, state
             # return the ground truth stop light for testing vehicle stopping
             return light_wp, state
