@@ -181,7 +181,7 @@ class TLDetector(object):
                 min_dist_lateral = dist_lateral
         return nearest_light_idx
 
-    def get_car_in_plane_theta(car_pose):
+    def get_car_in_plane_theta(self, car_pose):
         theta = 2 * math.atan2(car_pose.pose.orientation.z,
                             car_pose.pose.orientation.w)
         return theta
@@ -192,7 +192,7 @@ class TLDetector(object):
     # like map 3d to 2d, etc.
     # Reference: https://discussions.udacity.com/t/focal-length-wrong/358568/22?u=alanxiaoyi
     def if_tl_visible(self, car_pose, light_idx):
-        theta = get_car_in_plane_theta(car_pose)
+        theta = self.get_car_in_plane_theta(car_pose)
         # Unit vector in direction of car's line of sight
         v_hat_x = math.cos(theta)
         v_hat_y = math.sin(theta)
