@@ -185,13 +185,13 @@ class TLDetector(object):
     # Yipeng: This function is to determine if the car can see the traffic light.
     # For now, I just use a simple distance to check visibility.
     # From what I understand from discussion board, we may need more sophisticated one,
-    # like map 3d to 2d, etc. 
+    # like map 3d to 2d, etc.
     # Reference: https://discussions.udacity.com/t/focal-length-wrong/358568/22?u=alanxiaoyi
     def if_tl_visible(self, car_pose, light_idx):
         dx = self.lights[light_idx].pose.pose.position.x - car_pose.position.x
         dy = self.lights[light_idx].pose.pose.position.y - car_pose.position.y
         dist = math.sqrt(dx**2 + dy**2)
-        if dist > 5 and dist < 50:
+        if dist > 5 and dist < 70:
             return True
         else:
             return False
@@ -210,7 +210,7 @@ class TLDetector(object):
         if self.waypoints == None or self.pose == None:
             return -1, TrafficLight.UNKNOWN
 
-        
+
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
@@ -250,13 +250,16 @@ class TLDetector(object):
                                 nearest_stop_line_wp_idx, light_idx, light, state))
 
         if light:
-	    # Set OUTPUT_IMG = True to generate training data	
-	    if not OUTPUT_IMG:	
-            	state = self.get_light_state(light)
+	    # Set OUTPUT_IMG = True to generate training data
+	    # if not OUTPUT_IMG:
+        #     	state = self.get_light_state(light)
+        #     return light_wp, state
+            # return the ground truth stop light for testing vehicle stopping
             return light_wp, state
         #self.waypoints = None
 
         return -1, TrafficLight.UNKNOWN
+
 
 if __name__ == '__main__':
     try:

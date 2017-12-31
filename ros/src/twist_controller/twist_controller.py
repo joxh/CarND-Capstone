@@ -26,13 +26,13 @@ class Controller(object):
 
         # Create the yaw contoller
         self.yaw_ctl = YawController(self.wheel_base, self.steer_ratio, 0.1, self.max_lat_accel, self.max_steer_angle)
-        
-        # Create a PID controller 
-        # Use PID for linear and angular controll: 
+
+        # Create a PID controller
+        # Use PID for linear and angular controll:
         # https://discussions.udacity.com/t/solved-compute-cte-without-car-position/364383/2?u=alanxiaoyi
         # I just used some random parameters for now
         # TODO: the parameters need to be tuned
-        self.pid_ctl = PID(0.1, 0.1, 0.1, mn = self.decel_limit, mx = self.accel_limit)
+        self.pid_ctl = PID(0.5, 0, 0.2, mn = self.decel_limit, mx = self.accel_limit)
 
         # Create a lowpass filter
         # TODO: the parameters I just use random values I copied from discussion board

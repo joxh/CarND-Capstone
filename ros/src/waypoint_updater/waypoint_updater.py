@@ -8,6 +8,7 @@ from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, TransformStamped
 from styx_msgs.msg import Lane, Waypoint, TrafficLightArray
 
+import copy
 import math
 
 '''
@@ -37,12 +38,14 @@ class WaypointUpdater(object):
         self.got_base_waypoints = False
         self.current_waypoint_ind = None
 
+        self.set_speed = 11.1
+
         rospy.init_node('waypoint_updater')
 
         self.sub_current_pose = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         self.sub_base_waypoints = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
-        
+
         # Add a subscriber for /traffic_waypoint
         self.sub_traffic_waypoint = rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
@@ -55,7 +58,8 @@ class WaypointUpdater(object):
 
         #SIM ONLY: TrafficLightArray
         self.sub_traffic_lights_gt = rospy.Subscriber('/traffic_waypoint', TrafficLightArray, self.traffic_lights_gt_cb)
-        
+
+        self.Upcoming_red_light_idx = None
 
         rospy.spin()
 
@@ -69,15 +73,11 @@ class WaypointUpdater(object):
             self.publish_next_waypoints()
         else:
             pass
-            
-
-        rospy.loginfo('Current pose is (%s, %s, %s), and got_base_waypoints is %s', 
-                      msg.pose.position.x, msg.pose.position.y, msg.pose.position.z, self.got_base_waypoints)
-
-        
 
 
-        
+        # rospy.loginfo('Current pose is (%s, %s, %s), and got_base_waypoints is %s',
+        #               msg.pose.position.x, msg.pose.position.y, msg.pose.position.z, self.got_base_waypoints)
+
 
     def waypoints_cb(self, waypoints):
         # TODO: Implement
@@ -88,9 +88,14 @@ class WaypointUpdater(object):
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
-        rospy.loginfo('Current /traffic_waypoint is %s', msg.data)
+        if msg.data != -1:
+            rospy.loginfo('Red light coming up @ idx=%s', msg.data)
+            self.Upcoming_red_light_idx = msg.data#(msg.data-5)%self.num_waypoints
+        else:
+            rospy.loginfo('No red light coming up')
+            self.Upcoming_red_light_idx = None
 
-        pass
+
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -115,15 +120,15 @@ class WaypointUpdater(object):
         return dist
 
     def publish_next_waypoints(self):
-        
+
         next_waypoint_ind = None
         min_dist_lateral = None
         current_pose = self.current_pose
 
-        theta = 2 * math.atan2(current_pose.pose.orientation.z, 
+        theta = 2 * math.atan2(current_pose.pose.orientation.z,
                             current_pose.pose.orientation.w)
 
-        rospy.loginfo('Theta= %s', theta * 180 / math.pi)
+        # rospy.loginfo('Theta= %s', theta * 180 / math.pi)
 
 
         yhat = math.sin(theta)
@@ -147,30 +152,113 @@ class WaypointUpdater(object):
                 if next_waypoint_ind is not None:
                     if dist_lateral < min_dist_lateral:
                         next_waypoint_ind = i
-                        min_dist_lateral = dist_lateral 
+                        min_dist_lateral = dist_lateral
                 else:
                     next_waypoint_ind = i
                     min_dist_lateral = dist_lateral
-        
+
         if next_waypoint_ind is None:
             next_waypoint_ind = 0
             self.current_waypoint_ind = None
         else:
             self.current_waypoint_ind = next_waypoint_ind
-        
+
         #Check if need to read forward or backwards: Not implemented
-        
 
         waypoints_ind_to_return = [(i + next_waypoint_ind)%self.num_waypoints for i in range(LOOKAHEAD_WPS)]
         waypoints_to_return = [self.base_waypoints_lane.waypoints[i] for i in waypoints_ind_to_return]
-        
+
+
+        # jkpld: Smooth slow down for red lights and acceleration on green
+        # lights.
+        # very simple approach. when a red light is comming up, decrease the
+        # waypoints' speed slowly to 0 at the stop line. when the light goes
+        # green, slowly incrase the waypoints' speeds back up to the set speed
+        # NOTE : I need the parameter `velocity` from waypoint_loader, but I do
+        # not know how to get that in this program, so I hard coded it above in
+        # with the property set_speed.
+        if self.Upcoming_red_light_idx:
+            rospy.loginfo('Upcoming red light in : {:0.2f}m'.format(self.distance(self.base_waypoints_lane.waypoints, next_waypoint_ind, self.Upcoming_red_light_idx)))
+
+
+        current_speed = self.get_waypoint_velocity(waypoints_to_return[0])
+
+        if self.Upcoming_red_light_idx and (self.Upcoming_red_light_idx < (next_waypoint_ind+LOOKAHEAD_WPS)):
+            # there is a red light coming up in range of our lookahead, so
+            # start slowing down the car to have a speed of 0 at and after
+            # waypoint Upcoming_red_light_idx
+
+            # move 1 waypoint farther from light to give larger buffer zone.
+            self.Upcoming_red_light_idx = (self.Upcoming_red_light_idx - 1)%self.num_waypoints
+
+            # Distance until red light
+            dist = self.distance(self.base_waypoints_lane.waypoints, next_waypoint_ind, self.Upcoming_red_light_idx)
+            final_speed = 0 # goal speed
+            ds = current_speed - final_speed # speed difference
+
+            # approach_fun : use linear for linearly decreasing speed or
+            # math.sqrt for a faster slow down initially and a slow approach to
+            # the light
+            # if dist < 20:
+            #     approach_fun = lambda x : math.sqrt(x)
+            # else:
+            approach_fun = lambda x : x
+
+            dx = 0
+            for i in range(1,LOOKAHEAD_WPS):
+
+                if i < self.Upcoming_red_light_idx - next_waypoint_ind+1:
+                    # Distance traveled
+                    wp0 = waypoints_to_return[i-1].pose.pose.position
+                    wp1 = waypoints_to_return[i].pose.pose.position
+                    dxi = wp0.x - wp1.x
+                    dyi = wp0.y - wp1.y
+                    dist_lateral = math.sqrt(dxi**2 + dyi**2)
+                    dx += dist_lateral
+
+                    speed_i = max(round(10*(current_speed - approach_fun(dx/dist)*ds))/10, 0)
+                    rospy.loginfo('dist = {}, speed_diff = {}, dx = {}, new_speed = {}'.format(dist, ds, dx, speed_i))
+                    self.set_waypoint_velocity(waypoints_to_return, i, speed_i)
+                else:
+                    self.set_waypoint_velocity(waypoints_to_return, i, final_speed)
+        else:
+            # If the current speed is more than 40% different from the set speed
+            # then create a linearly chaning set speed for the waypoints.
+            # If the speed is within 40% of the set speed, then let the
+            # controller handle it.
+            if abs(current_speed - self.set_speed)/self.set_speed > 0.4:
+                dist = self.distance(waypoints_to_return,0,LOOKAHEAD_WPS-2)
+                if dist > 0:
+                    accel_rate = (current_speed - self.set_speed)/dist
+                else:
+                    accel_rate = 0
+
+                dx = 0
+                for i in range(0,LOOKAHEAD_WPS):
+                    # rospy.loginfo('Setting car speed to {}'.format(11.1))
+                    wp0 = waypoints_to_return[i-1].pose.pose.position
+                    wp1 = waypoints_to_return[i].pose.pose.position
+                    dxi = wp0.x - wp1.x
+                    dyi = wp0.y - wp1.y
+                    dist_lateral = math.sqrt(dxi**2 + dyi**2)
+                    dx += dist_lateral
+                    self.set_waypoint_velocity(waypoints_to_return, i, current_speed - dx*accel_rate)
+            else:
+                for i in range(0,LOOKAHEAD_WPS):
+                    self.set_waypoint_velocity(waypoints_to_return, i, self.set_speed)
+
+        rospy.loginfo('Current waypoint set speed : {:0.2f}m'.format(self.get_waypoint_velocity(waypoints_to_return[0])))
+        rospy.loginfo('Current waypoint set speed (from base): {:0.2f}m'.format(self.get_waypoint_velocity(self.base_waypoints_lane.waypoints[next_waypoint_ind])))
+
+
+
         lane_to_publish = Lane()
         lane_to_publish.header = self.current_pose.header
         lane_to_publish.waypoints = waypoints_to_return
         self.final_waypoints_pub.publish(lane_to_publish)
 
-        rospy.loginfo('Next waypoint is %s', 
-                      waypoints_to_return[0].pose)
+        # rospy.loginfo('Next waypoint is %s',
+        #               waypoints_to_return[0].pose)
 
 
 if __name__ == '__main__':
