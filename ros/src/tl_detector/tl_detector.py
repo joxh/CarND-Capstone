@@ -113,12 +113,12 @@ class TLDetector(object):
             if not os.path.exists("./output_imgs"):
                 os.makedirs("./output_imgs")
             cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-	    # Call process_traffic_lights to get state in sync with image
-	    light_wp, state = self.process_traffic_lights()
-            cv2.imwrite('./output_imgs/' + str(self.output_img_cnt)  + '_' + str(state) + '.png', cv_image)
-            rospy.loginfo('Write to image output file' + str(os.getcwd()) + str(self.output_img_cnt))
-            self.output_img_cnt = self.output_img_cnt + 1
-            rate.sleep()
+        # Call process_traffic_lights to get state in sync with image
+        light_wp, state = self.process_traffic_lights()
+        cv2.imwrite('./output_imgs/' + str(self.output_img_cnt)  + '_' + str(state) + '.png', cv_image)
+        rospy.loginfo('Write to image output file' + str(os.getcwd()) + str(self.output_img_cnt))
+        self.output_img_cnt = self.output_img_cnt + 1
+        rate.sleep()
 
     def get_closest_waypoint(self, pose):
         """Identifies the closest path waypoint to the given position
@@ -160,7 +160,7 @@ class TLDetector(object):
             self.prev_light_loc = None
             return False
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
         #Get classification
         return self.light_classifier.get_classification(cv_image)
@@ -243,16 +243,17 @@ class TLDetector(object):
         light = self.if_tl_visible(self.pose.pose, light_idx)
         # Ground truth light state, used for training only:
         state = self.lights[light_idx].state
-	# Nest light waypoint
-	light_wp = nearest_stop_line_wp_idx
+        # Nest light waypoint
+        light_wp = nearest_stop_line_wp_idx
         # Print out the information. We can use this together with images for generating training set.
-        rospy.loginfo('Car_waypoint:{}, next_stopline_waypoint:{}, next_tl_index:{},tl_visibility:{}, state{}'.format(car_position,
-                                nearest_stop_line_wp_idx, light_idx, light, state))
-
+        #rospy.loginfo('Car_waypoint:{}, next_stopline_waypoint:{}, next_tl_index:{},tl_visibility:{}, state{}'.format(car_position,
+        #                        nearest_stop_line_wp_idx, light_idx, light, state))
+        light=1 #for testing
         if light:
-	    # Set OUTPUT_IMG = True to generate training data
-	    # if not OUTPUT_IMG:
-        #     	state = self.get_light_state(light)
+        # Set OUTPUT_IMG = True to generate training data
+        # if not OUTPUT_IMG:
+            state = self.get_light_state(light)
+            rospy.loginfo(state)
         #     return light_wp, state
             # return the ground truth stop light for testing vehicle stopping
             return light_wp, state
@@ -266,3 +267,4 @@ if __name__ == '__main__':
         TLDetector()
     except rospy.ROSInterruptException:
         rospy.logerr('Could not start traffic node.')
+rospy.loginfo(state)

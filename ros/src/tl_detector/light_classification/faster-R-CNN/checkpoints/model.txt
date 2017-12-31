@@ -1,0 +1,3 @@
+donwload model from
+
+https://www.dropbox.com/s/clgurx3tfhptafe/frozen_inference_graph.pb?dl=0
