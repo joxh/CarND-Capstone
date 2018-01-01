@@ -38,7 +38,7 @@ class WaypointUpdater(object):
         self.got_base_waypoints = False
         self.current_waypoint_ind = None
 
-        self.set_speed = 11.1
+        self.set_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity'))
 
         rospy.init_node('waypoint_updater')
 
@@ -73,6 +73,7 @@ class WaypointUpdater(object):
         if self.got_base_waypoints and msg.header.seq % 10 == 0:
             if msg.header.seq % 100 == 0:
                 self.current_waypoint_ind = None
+                self.set_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity'))
             self.publish_next_waypoints()
         else:
             pass
@@ -107,6 +108,9 @@ class WaypointUpdater(object):
     def traffic_lights_gt_cb(self, msg):
         # TODO: Callback for dealing with traffic light ground truth
         pass
+
+    def kmph2mps(self, velocity_kmph):
+        return (velocity_kmph * 1000.) / (60. * 60.)
 
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
