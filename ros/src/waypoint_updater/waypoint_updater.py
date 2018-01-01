@@ -189,7 +189,7 @@ class WaypointUpdater(object):
         if self.Upcoming_red_light_idx:
             rospy.loginfo('Upcoming red light in : {:0.2f}m'.format(self.distance(self.base_waypoints_lane.waypoints, next_waypoint_ind, self.Upcoming_red_light_idx)))
             # move 1 waypoint farther from light to give larger buffer zone.
-            self.Upcoming_red_light_idx = (self.Upcoming_red_light_idx - 1)%self.num_waypoints
+            # self.Upcoming_red_light_idx = (self.Upcoming_red_light_idx - 1)%self.num_waypoints
             # Distance until red light
             dist = self.distance(self.base_waypoints_lane.waypoints, next_waypoint_ind, self.Upcoming_red_light_idx)
 
@@ -216,7 +216,7 @@ class WaypointUpdater(object):
                 # approach_fun : use linear for linearly decreasing speed or
                 # math.sqrt for a faster slow down initially and a slow approach to
                 # approach_fun = lambda x : math.sqrt(x)
-                approach_fun = lambda x : x
+                approach_fun = lambda x : x**1.2
 
                 dx = 0
                 for i in range(1,LOOKAHEAD_WPS):
@@ -230,7 +230,8 @@ class WaypointUpdater(object):
                         dist_lateral = math.sqrt(dxi**2 + dyi**2)
                         dx += dist_lateral
 
-                        speed_i = max(round(10*(current_speed - approach_fun(dx/dist)*ds))/10, 0)
+                        # speed_i = max(round(10*(current_speed - approach_fun(dx/dist)*ds))/10, 0)
+                        speed_i = max(current_speed - approach_fun(dx/dist)*ds, 0)
                         rospy.loginfo('dist = {}, speed_diff = {}, dx = {}, new_speed = {}'.format(dist, ds, dx, speed_i))
                         self.set_waypoint_velocity(waypoints_to_return, i, speed_i)
                     else:
