@@ -1,7 +1,7 @@
 from pid import PID
 from lowpass import LowPassFilter
 from yaw_controller import YawController
-
+#import rospy
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
@@ -32,7 +32,7 @@ class Controller(object):
         # https://discussions.udacity.com/t/solved-compute-cte-without-car-position/364383/2?u=alanxiaoyi
         # I just used some random parameters for now
         # TODO: the parameters need to be tuned
-        self.pid_ctl = PID(0.5, 0, 0.2, mn = self.decel_limit, mx = self.accel_limit)
+        self.pid_ctl = PID(0.5, 0.01, 0.01, mn = self.decel_limit, mx = self.accel_limit)
 
         # Create a lowpass filter
         # TODO: the parameters I just use random values I copied from discussion board
@@ -63,7 +63,11 @@ class Controller(object):
         throttle = 0.0
         brake = 0.0
 
-        # TODO: throttle may need to be tuned with a ratio (?)
+        if target_linear.x == 0:
+                brake = -self.accel_to_brake(self.decel_limit)
+                if current_velocity.twist.linear.x == 0:
+                        self.resetpid()
+                return 0, brake, 0
 
         # if we need throttle:
         if accel > 0:
@@ -71,7 +75,9 @@ class Controller(object):
 
         # if we need brake:
         else:
-               brake = -self.accel_to_brake(max(self.decel_limit, accel))
+                brake = -self.accel_to_brake(max(self.decel_limit, accel))
+
+        #rospy.loginfo('accel {} brake {}'.format(accel,brake))
 
         return throttle, brake, steer
 
