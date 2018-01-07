@@ -38,7 +38,7 @@ class TLDetector(object):
         rely on the position of the light and the camera image to predict it.
         '''
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1, buff_size=6*1450000)
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -206,7 +206,7 @@ class TLDetector(object):
 
         angle_to_tl_relative = ((angle_to_tl_absolute - theta) + math.pi)%(2 * math.pi) - math.pi
 
-        light_is_close = dist > 5 and dist < 70
+        light_is_close = dist > 5 and dist < 100
 
         light_is_in_front = abs(angle_to_tl_relative) < math.pi/2
 
@@ -263,7 +263,8 @@ class TLDetector(object):
         # Ground truth light state, used for training only:
         state = self.lights[light_idx].state
         # Nest light waypoint
-        light_wp = nearest_stop_line_wp_idx
+        light_wp = nearest_stop_line_wp_idx - 2 #Buffer area before stop line.
+
         # Print out the information. We can use this together with images for generating training set.
         #rospy.loginfo('Car_waypoint:{}, next_stopline_waypoint:{}, next_tl_index:{},tl_visibility:{}, state{}'.format(car_position,
         #                        nearest_stop_line_wp_idx, light_idx, light, state))
@@ -271,8 +272,8 @@ class TLDetector(object):
         if light:
         # Set OUTPUT_IMG = True to generate training data
         # if not OUTPUT_IMG:
-            # state = self.get_light_state(light)
-            # rospy.loginfo(state)
+            state = self.get_light_state(light)
+            #rospy.loginfo(state)
         #     return light_wp, state
             # return the ground truth stop light for testing vehicle stopping
             return light_wp, state

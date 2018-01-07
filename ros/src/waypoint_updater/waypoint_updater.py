@@ -26,7 +26,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 25 # Number of waypoints we will publish. You can change this number
 
 
 class WaypointUpdater(object):
@@ -220,7 +220,7 @@ class WaypointUpdater(object):
                 # approach_fun : use linear for linearly decreasing speed or
                 # math.sqrt for a faster slow down initially and a slow approach to
                 # approach_fun = lambda x : math.sqrt(x)
-                approach_fun = lambda x : x**1.2
+                approach_fun = lambda x : math.sqrt(x) #x**1.2
 
                 dx = 0
                 for i in range(1,LOOKAHEAD_WPS):

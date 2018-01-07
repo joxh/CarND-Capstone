@@ -6,12 +6,30 @@ import tensorflow as tf
 import numpy as np
 from functools import partial
 
-THRESHOLD = 0.50
+THRESHOLD = 0.20
 
 class TLClassifier(object):
     def __init__(self):
         self.model_path = os.path.dirname(os.path.realpath(__file__))
         self.current_light = TrafficLight.UNKNOWN
+
+        self.readsize = 1024
+        # Re-Build the model for first time
+        if not os.path.exists(self.model_path+'/faster-R-CNN/checkpoints/frozen_inference_graph.pb'):
+            # if not - build it back up
+            #if not os.path.exists(self.model_path+'faster-R-CNN/chunks'):
+            output = open(self.model_path+'/faster-R-CNN/checkpoints/frozen_inference_graph.pb', 'wb')
+            chunks = os.listdir(self.model_path+'/faster-R-CNN/chunks')
+            chunks.sort()
+            for filename in chunks:
+                filepath = os.path.join(self.model_path+'/faster-R-CNN/chunks', filename)
+                #print filepath
+                with open(filepath, 'rb') as fileobj:
+                    for chunk in iter(partial(fileobj.read, self.readsize), ''):
+                        output.write(chunk)
+            output.close()
+
+
 
         PATH_TO_CKPT = self.model_path+'/faster-R-CNN/checkpoints/frozen_inference_graph.pb'
 
@@ -71,6 +89,6 @@ class TLClassifier(object):
                 self.current_light = TrafficLight.YELLOW #1
             elif cc == 3:
                 self.current_light = TrafficLight.GREEN #2
-            print self.current_light
+            #print self.current_light
 
         return self.current_light
