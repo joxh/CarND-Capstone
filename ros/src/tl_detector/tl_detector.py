@@ -263,7 +263,7 @@ class TLDetector(object):
         # Ground truth light state, used for training only:
         state = self.lights[light_idx].state
         # Nest light waypoint
-        light_wp = nearest_stop_line_wp_idx - 2 #Buffer area before stop line.
+        light_wp = nearest_stop_line_wp_idx - 3 #Buffer area before stop line.
 
         # Print out the information. We can use this together with images for generating training set.
         #rospy.loginfo('Car_waypoint:{}, next_stopline_waypoint:{}, next_tl_index:{},tl_visibility:{}, state{}'.format(car_position,
