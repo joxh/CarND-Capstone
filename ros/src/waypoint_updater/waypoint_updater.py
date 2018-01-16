@@ -38,6 +38,9 @@ class WaypointUpdater(object):
         self.got_base_waypoints = False
         self.current_waypoint_ind = None
 
+        self.initialize_WP = True
+
+
         self.set_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity'))
 
         rospy.init_node('waypoint_updater')
@@ -63,11 +66,22 @@ class WaypointUpdater(object):
         self.stopping = False
         self.already_decreased_speed = False
 
-
-        rospy.spin()
+        rate = rospy.Rate(1) # 1hz
+        while not rospy.is_shutdown():
+            #hello_str = "hello world %s" % rospy.get_time()
+            #rospy.loginfo(hello_str)
+            #pub.publish(hello_str)
+            self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
+            rate.sleep()
 
     def pose_cb(self, msg):
         # TODO: Implement
+
+        #First time 
+        if self.initialize_WP:
+            rospy.sleep(10)
+            self.initialize_WP = False
+
         self.current_pose = msg
 
         if self.got_base_waypoints and msg.header.seq % 10 == 0:
@@ -81,6 +95,7 @@ class WaypointUpdater(object):
 
         # rospy.loginfo('Current pose is (%s, %s, %s), and got_base_waypoints is %s',
         #               msg.pose.position.x, msg.pose.position.y, msg.pose.position.z, self.got_base_waypoints)
+
 
 
     def waypoints_cb(self, waypoints):

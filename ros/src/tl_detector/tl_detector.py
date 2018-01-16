@@ -27,6 +27,8 @@ class TLDetector(object):
         self.camera_image = None
         self.lights = []
 
+        self.initialize_tf = True
+
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
@@ -43,7 +45,6 @@ class TLDetector(object):
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
 
-        self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier()
@@ -55,9 +56,17 @@ class TLDetector(object):
         self.state_count = 0
         self.output_img_cnt = 0
 
+
         if OUTPUT_IMG == True:
             self.output_img_loop()
-        rospy.spin()
+
+        rate = rospy.Rate(10) # 10hz
+        while not rospy.is_shutdown():
+            #hello_str = "hello world %s" % rospy.get_time()
+            #rospy.loginfo(hello_str)
+            #pub.publish(hello_str)
+            self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
+            rate.sleep()
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -76,6 +85,14 @@ class TLDetector(object):
             msg (Image): image from car-mounted camera
 
         """
+
+        #First time to load TF model on memory
+        if self.initialize_tf:
+            print "##### Loading TF model 10 sec #####"
+            rospy.sleep(6)
+            self.initialize_tf = False
+            print "#### Done ####"
+
         self.has_image = True
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
